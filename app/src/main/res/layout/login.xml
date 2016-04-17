@@ -31,11 +31,11 @@
         android:layout_height="wrap_content"
         android:text="login"
         android:id="@+id/loginButton"
+        android:background="?attr/colorPrimary"
+        android:textColor="@color/white"
         android:layout_below="@+id/pwd"
         android:layout_alignRight="@+id/pwd"
-        android:layout_alignEnd="@+id/pwd"
-        android:background="?attr/colorPrimary"
-        android:textColor="@color/white"/>
+        android:layout_alignEnd="@+id/pwd" />
 
     <EditText
         android:layout_width="wrap_content"
@@ -75,8 +75,39 @@
         android:text="@string/login_with_google"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/pwd"
+        android:layout_alignTop="@+id/loginButton"
         android:layout_alignLeft="@+id/pwd"
         android:layout_alignStart="@+id/pwd" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sign up"
+        android:id="@+id/signup"
+        android:textColor="@color/white"
+        android:background="?attr/colorPrimary"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="re enter passsword"
+        android:id="@+id/pwrdView2"
+        android:layout_below="@+id/pwd"
+        android:layout_centerHorizontal="true"
+        android:visibility="gone"/>
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="textPassword"
+        android:ems="10"
+        android:id="@+id/pwd2"
+        android:layout_below="@+id/pwrdView2"
+        android:layout_centerHorizontal="true"
+        android:visibility="gone"/>
+
 
 </RelativeLayout>

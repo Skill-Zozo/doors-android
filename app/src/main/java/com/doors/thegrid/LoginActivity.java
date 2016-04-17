@@ -16,10 +16,11 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import com.firebase.client.AuthData;
 import com.firebase.client.Firebase;
@@ -49,7 +50,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
     private Firebase mFirebaseRef;
     private Firebase.AuthStateListener mAuthStateListener;
     private Button mPasswordLoginButton;
-
+    private static final String TAG = LoginActivity.class.getSimpleName();
 
     /**
      * GOOGLE SETUP
@@ -70,15 +71,36 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
     private EditText mUserView;
     private EditText mPasswordView;
     private View mProgressView;
-    private View mLoginFormView;
     private ProgressDialog mAuthProgressDialog;
-
-
+    private Button mStartSignUp;
+    private Button mSignUp;
+    private TextView mReEnterPWD;
+    private EditText mReEnterPassword;
+    private boolean signupClicked = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Firebase.setAndroidContext(this);
         setContentView(R.layout.login);
+
+        mStartSignUp = (Button) findViewById(R.id.signup);
+        mReEnterPWD = (TextView) findViewById(R.id.pwrdView2);
+        mReEnterPassword = (EditText) findViewById(R.id.pwd2);
+        mStartSignUp.setOnClickListener((new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                if(!signupClicked) {
+                    mGoogleLoginButton.setVisibility(View.GONE);
+                    mPasswordLoginButton.setVisibility(View.GONE);
+                    mReEnterPassword.setVisibility(View.VISIBLE);
+                    mReEnterPWD.setVisibility(View.VISIBLE);
+                    signupClicked = true;
+                } else {
+                    attemptSignup();
+                    signupClicked =false;
+                }
+            }
+        }));
         /**
          *  Handle Google login
          **/
@@ -93,7 +115,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                     } else if (mGoogleApiClient.isConnected()) {
                         getGoogleOAuthTokenAndLogin();
                     } else {
-                    /* connect API now */
                         mGoogleApiClient.connect();
                     }
                 }
@@ -123,7 +144,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         });
         ;
 
-        mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
 
         /* Create the Firebase ref that is used for all authentication with Firebase */
@@ -154,12 +174,11 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         super.onDestroy();
         // if changing configurations, stop tracking firebase session.
         mFirebaseRef.removeAuthStateListener(mAuthStateListener);
+        mAuthProgressDialog.dismiss();
     }
 
     private void setAuthenticatedUser(AuthData authData) {
         if (authData != null) {
-            /* Hide all the login buttons */
-            mGoogleLoginButton.setVisibility(View.GONE);
             /* show a provider specific status text */
             String name = null;
             if (authData.getProvider().equals("google")) {
@@ -202,7 +221,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
      * If there are form errors (invalid email, missing fields, etc.), the
      * errors are presented and no actual login attempt is made.
      */
-    private void attemptLogin() {
+    private void attemptLogin(boolean... signup) {
         mAuthProgressDialog.show();
         mFirebaseRef.authWithPassword("test@firebaseuser.com", "test1234", new AuthResultHandler("password"));
         if (mAuthTask != null) {
@@ -218,7 +237,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         String password = mPasswordView.getText().toString();
 
         boolean cancel = false;
-        View focusView = null;
+        View focusView = mPasswordView;
 
         // Check for a valid password, if the user entered one.
         if (!TextUtils.isEmpty(password) && !isPasswordValid(password)) {
@@ -237,6 +256,19 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
             focusView = mUserView;
             cancel = true;
         }
+        //create user
+        if(signup!=null && signup[0]) {
+            String confirmPassword = mReEnterPassword.getText().toString();
+            if(TextUtils.isEmpty(confirmPassword)) {
+                mReEnterPassword.setError("re enter password");
+                cancel = true;
+            }
+            if(!confirmPassword.equals(password)) {
+                mReEnterPassword.setError("passwords do not match");
+                cancel = true;
+            }
+            if (!cancel) createUser(email, password);
+        }
 
         if (cancel) {
             // There was an error; don't attempt login and focus the first
@@ -245,10 +277,40 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         } else {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
-            showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
-            mAuthTask.execute((Void) null);
+            //showProgress(true);
+            loginUser(email, password);
         }
+    }
+
+    private void loginUser(String email, String password) {
+        mFirebaseRef.authWithPassword(email, password, new Firebase.AuthResultHandler() {
+            @Override
+            public void onAuthenticated(AuthData authData) {
+                System.out.println("User ID: " + authData.getUid() + ", Provider: " + authData.getProvider());
+            }
+            @Override
+            public void onAuthenticationError(FirebaseError firebaseError) {
+                // there was an error
+            }
+        });
+    }
+
+    private void createUser(String email, String password) {
+        mFirebaseRef.createUser(email, password, new Firebase.ValueResultHandler<Map<String, Object>>() {
+            @Override
+            public void onSuccess(Map<String, Object> result) {
+                System.out.println("Successfully created user account with uid: " + result.get("uid"));
+            }
+
+            @Override
+            public void onError(FirebaseError fberror){
+                System.out.println(fberror);
+            }
+        });
+    }
+
+    private void attemptSignup() {
+        attemptLogin(true);
     }
 
     private boolean isEmailValid(String usrname) {
@@ -257,46 +319,24 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
     }
 
     private boolean isPasswordValid(String password) {
-        //TODO: Replace this with your own logic
-        return password.length() > 4;
-    }
-
-    /**
-     * Shows the progress UI and hides the login form.
-     */
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
-    private void showProgress(final boolean show) {
-        // On Honeycomb MR2 we have the ViewPropertyAnimator APIs, which allow
-        // for very easy animations. If available, use these APIs to fade-in
-        // the progress spinner.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
-            int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
-
-            mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-            mLoginFormView.animate().setDuration(shortAnimTime).alpha(
-                    show ? 0 : 1).setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-                }
-            });
-
-            mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-            mProgressView.animate().setDuration(shortAnimTime).alpha(
-                    show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-                }
-            });
-        } else {
-            // The ViewPropertyAnimator APIs are not available, so simply show
-            // and hide the relevant UI components.
-            mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-            mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
+        if (!password.matches(".*\\d+.*")) {
+            mPasswordView.setError("password must contain a digit");
+            return false;
         }
+        if (!password.matches(".*[^a-zA-Z0-9].*")) {
+            mPasswordView.setError("password must contain a special character");
+            return false;
+        }
+        if (password.matches(".*" + mUserView.getText().toString() +".*")) {
+            mPasswordView.setError("password too obvious");
+            return false;
+        }
+        if (password.length() < 6) {
+            mPasswordView.setError("password too short");
+            return false;
+        }
+        return true;
     }
-
 
     @Override
     public void onConnected(Bundle bundle) {
@@ -323,16 +363,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         }
     }
 
-
-    private void authWithFirebase(final String provider, Map<String, String> options) {
-        if (options.containsKey("error")) {
-            showErrorDialog(options.get("error"));
-        } else {
-            mAuthProgressDialog.show();
-            mFirebaseRef.authWithOAuthToken(provider, options.get("oauth_token"), new AuthResultHandler(provider));
-        }
-    }
-
     /**
      * Show errors to users
      */
@@ -341,8 +371,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                 .setTitle("Error")
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .show();
+                .setIcon(android.R.drawable.ic_dialog_alert);
     }
 
     private void getGoogleOAuthTokenAndLogin() {
@@ -405,12 +434,14 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         @Override
         public void onAuthenticated(AuthData authData) {
             mAuthProgressDialog.hide();
+            Log.i(TAG, provider + " auth successful");
             setAuthenticatedUser(authData);
         }
 
         @Override
         public void onAuthenticationError(FirebaseError firebaseError) {
             mAuthProgressDialog.hide();
+            showErrorDialog(firebaseError.toString());
         }
     }
 
@@ -470,7 +501,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
 
             try {
                 mAuthProgressDialog.show();
-                mFirebaseRef.authWithPassword("banele@mailinator.com", "test1234", new AuthResultHandler("password"));
+                mFirebaseRef.authWithPassword(mUser, mPassword, new AuthResultHandler("password"));
             } catch (Exception e) {
                 return false;
             }
@@ -482,8 +513,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         @Override
         protected void onPostExecute(final Boolean success) {
             mAuthTask = null;
-            showProgress(false);
-
             if (success) {
                 finish();
             } else {
@@ -495,7 +524,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         @Override
         protected void onCancelled() {
             mAuthTask = null;
-            showProgress(false);
         }
     }
 }
