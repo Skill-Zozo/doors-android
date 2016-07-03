@@ -1,19 +1,14 @@
 package com.doors.thegrid;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AlertDialog;
 
 import android.os.AsyncTask;
-
-import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -21,10 +16,6 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-
-import com.firebase.client.AuthData;
-import com.firebase.client.Firebase;
-import com.firebase.client.FirebaseError;
 
 import com.google.android.gms.auth.GoogleAuthException;
 import com.google.android.gms.auth.GoogleAuthUtil;
@@ -37,7 +28,6 @@ import com.google.android.gms.plus.Plus;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 
@@ -46,16 +36,13 @@ import java.util.Map;
  */
 public class LoginActivity extends ActionBarActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
-    private AuthData mAuthData;
-    private Firebase mFirebaseRef;
-    private Firebase.AuthStateListener mAuthStateListener;
     private Button mPasswordLoginButton;
     private static final String TAG = LoginActivity.class.getSimpleName();
+    private Profile mUser;
 
     /**
      * GOOGLE SETUP
      */
-
     private GoogleApiClient mGoogleApiClient;
     private static final int RC_GOOGLE_LOGIN = 1;
     private boolean mGoogleLoginClicked;
@@ -70,17 +57,20 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
     // UI references.
     private EditText mUserView;
     private EditText mPasswordView;
-    private View mProgressView;
     private ProgressDialog mAuthProgressDialog;
     private Button mStartSignUp;
-    private Button mSignUp;
     private TextView mReEnterPWD;
     private EditText mReEnterPassword;
     private boolean signupClicked = false;
+
+    /**
+     *
+     * server communications
+     */
+    private Connector mConnection = new Connector();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Firebase.setAndroidContext(this);
         setContentView(R.layout.login);
 
         mStartSignUp = (Button) findViewById(R.id.signup);
@@ -111,7 +101,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                 mGoogleLoginClicked = true;
                 if (!mGoogleApiClient.isConnecting()) {
                     if (mGoogleConnectionResult != null) {
-                        resolveSignInError();
+                        //resolveSignInError();
                     } else if (mGoogleApiClient.isConnected()) {
                         getGoogleOAuthTokenAndLogin();
                     } else {
@@ -142,12 +132,8 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                 attemptLogin();
             }
         });
-        ;
 
-        mProgressView = findViewById(R.id.login_progress);
 
-        /* Create the Firebase ref that is used for all authentication with Firebase */
-        mFirebaseRef = new Firebase(getResources().getString(R.string.firebase_url));
 
         /* Setup the progress dialog that is displayed later when authenticating with Firebase */
         mAuthProgressDialog = new ProgressDialog(this);
@@ -156,44 +142,11 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         mAuthProgressDialog.setCancelable(false);
         mAuthProgressDialog.show();
 
-        mAuthStateListener = new Firebase.AuthStateListener() {
-            @Override
-            public void onAuthStateChanged(AuthData authData) {
-                mAuthProgressDialog.hide();
-                setAuthenticatedUser(authData);
-            }
-        };
-        /* Check if the user is authenticated with Firebase already. If this is the case we can set the authenticated
-         * user and hide hide any login buttons */
-        mFirebaseRef.addAuthStateListener(mAuthStateListener);
-
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // if changing configurations, stop tracking firebase session.
-        mFirebaseRef.removeAuthStateListener(mAuthStateListener);
-        mAuthProgressDialog.dismiss();
-    }
-
-    private void setAuthenticatedUser(AuthData authData) {
-        if (authData != null) {
-            /* show a provider specific status text */
-            String name = null;
-            if (authData.getProvider().equals("google")) {
-                name = (String) authData.getProviderData().get("displayName");
-            } else if (authData.getProvider().equals("anonymous")) {
-                name = authData.getUid();
-            }
-
-        } else {
-            /* No authenticated user show all the login buttons */
-            mGoogleLoginButton.setVisibility(View.VISIBLE);
-        }
-        this.mAuthData = authData;
-        /* invalidate options menu to hide/show the logout button */
-        supportInvalidateOptionsMenu();
     }
 
     /**
@@ -216,17 +169,19 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         }
     }
 
+    private void switchActivity() {
+        Activity main = new MainActivity();
+        Intent intent = new Intent(getApplicationContext(), main.getClass());
+        intent.putExtra("user", mUser);
+        startActivity(intent);
+    }
+
     /**
      * Attempts to sign in or register the account specified by the login form.
      * If there are form errors (invalid email, missing fields, etc.), the
      * errors are presented and no actual login attempt is made.
      */
     private void attemptLogin(boolean... signup) {
-        mAuthProgressDialog.show();
-        mFirebaseRef.authWithPassword("test@firebaseuser.com", "test1234", new AuthResultHandler("password"));
-        if (mAuthTask != null) {
-            return;
-        }
 
         // Reset errors.
         mUserView.setError(null);
@@ -256,6 +211,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
             focusView = mUserView;
             cancel = true;
         }
+
         //create user
         if(signup!=null && signup[0]) {
             String confirmPassword = mReEnterPassword.getText().toString();
@@ -277,36 +233,22 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         } else {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
-            //showProgress(true);
             loginUser(email, password);
         }
     }
 
     private void loginUser(String email, String password) {
-        mFirebaseRef.authWithPassword(email, password, new Firebase.AuthResultHandler() {
-            @Override
-            public void onAuthenticated(AuthData authData) {
-                System.out.println("User ID: " + authData.getUid() + ", Provider: " + authData.getProvider());
-            }
-            @Override
-            public void onAuthenticationError(FirebaseError firebaseError) {
-                // there was an error
-            }
-        });
+        String connectionResult = mConnection.login(email, password);
+        System.out.println(connectionResult);
+        if(!connectionResult.contains("failed")) {
+            mUser = mConnection.getUser(email, password);
+            switchActivity();
+        }
+
     }
 
     private void createUser(String email, String password) {
-        mFirebaseRef.createUser(email, password, new Firebase.ValueResultHandler<Map<String, Object>>() {
-            @Override
-            public void onSuccess(Map<String, Object> result) {
-                System.out.println("Successfully created user account with uid: " + result.get("uid"));
-            }
-
-            @Override
-            public void onError(FirebaseError fberror){
-                System.out.println(fberror);
-            }
-        });
+        //
     }
 
     private void attemptSignup() {
@@ -319,7 +261,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
     }
 
     private boolean isPasswordValid(String password) {
-        if (!password.matches(".*\\d+.*")) {
+        /*if (!password.matches(".*\\d+.*")) {
             mPasswordView.setError("password must contain a digit");
             return false;
         }
@@ -334,14 +276,14 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
         if (password.length() < 6) {
             mPasswordView.setError("password too short");
             return false;
-        }
+        }*/
         return true;
     }
 
     @Override
     public void onConnected(Bundle bundle) {
         getGoogleOAuthTokenAndLogin();
-
+        //TODO: get your own token and begin session, Dikoko to help
     }
 
     @Override
@@ -410,7 +352,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                 mGoogleLoginClicked = false;
                 if (token != null) {
                     /* Successfully got OAuth token, now login with Google */
-                    mFirebaseRef.authWithOAuthToken("google", token, new AuthResultHandler("google"));
                 } else if (errorMessage != null) {
                     mAuthProgressDialog.hide();
                 }
@@ -423,27 +364,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
      * Utility class for authentication results
      */
 
-    private class AuthResultHandler implements Firebase.AuthResultHandler {
-
-        private final String provider;
-
-        public AuthResultHandler(String provider) {
-            this.provider = provider;
-        }
-
-        @Override
-        public void onAuthenticated(AuthData authData) {
-            mAuthProgressDialog.hide();
-            Log.i(TAG, provider + " auth successful");
-            setAuthenticatedUser(authData);
-        }
-
-        @Override
-        public void onAuthenticationError(FirebaseError firebaseError) {
-            mAuthProgressDialog.hide();
-            showErrorDialog(firebaseError.toString());
-        }
-    }
 
     /* A helper method to resolve the current ConnectionResult error. */
     private void resolveSignInError() {
@@ -457,27 +377,6 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
                 mGoogleIntentInProgress = false;
                 mGoogleApiClient.connect();
             }
-        }
-    }
-
-    /**
-     * Unauthenticate from Firebase and from providers where necessary.
-     */
-    private void logout() {
-        if (this.mAuthData != null) {
-            /* logout of Firebase */
-            mFirebaseRef.unauth();
-            /* Logout of any of the Frameworks. This step is optional, but ensures the user is not logged into
-             * Facebook/Google+ after logging out of Firebase. */
-            if (this.mAuthData.getProvider().equals("google")) {
-                /* Logout from Google+ */
-                if (mGoogleApiClient.isConnected()) {
-                    Plus.AccountApi.clearDefaultAccount(mGoogleApiClient);
-                    mGoogleApiClient.disconnect();
-                }
-            }
-            /* Update authenticated user and show login buttons */
-            setAuthenticatedUser(null);
         }
     }
 
@@ -501,7 +400,7 @@ public class LoginActivity extends ActionBarActivity implements GoogleApiClient.
 
             try {
                 mAuthProgressDialog.show();
-                mFirebaseRef.authWithPassword(mUser, mPassword, new AuthResultHandler("password"));
+                //mFirebaseRef.authWithPassword(mUser, mPassword, new AuthResultHandler("password"));
             } catch (Exception e) {
                 return false;
             }

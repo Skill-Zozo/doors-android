@@ -1,0 +1,4 @@
+com.mysql.jdbc.Driver
+jdbc:mysql://137.158.160.145:3306/mtsban004
+mtsban004
+naemaeng

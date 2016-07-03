@@ -19,4 +19,8 @@
     <string name="login_with_google">Sign In</string>
     <string name="firebase_url">"https://luminous-heat-3691.firebaseio.com/"</string>
     <string name="google_app_id">"Doors"</string>
+    <string name="title_activity_main">MainActivity</string>
+
+    <!-- String names for main content -->
+    <string name="locations_text">locations</string>
 </resources>

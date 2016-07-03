@@ -6,7 +6,7 @@ android {
 
     defaultConfig {
         applicationId "com.doors.thegrid"
-        minSdkVersion 15
+        minSdkVersion 20
         targetSdkVersion 23
         versionCode 1
         versionName "1.0"
@@ -20,8 +20,9 @@ android {
     }
     packagingOptions {
         exclude 'META-INF/LICENSE'
-        exclude 'META-INF/LICENSE-FIREBASE.txt'
         exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/DEPENDENCIES'
     }
 
 
@@ -32,12 +33,28 @@ android {
 }
 
 dependencies {
+    compile group: 'org.apache.httpcomponents' , name: 'httpclient-android' , version: '4.3.5.1'
     compile fileTree(include: ['*.jar'], dir: 'libs')
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:23.+'
     compile 'com.android.support:design:23.+'
-    compile files('libs/firebase-client-android-2.5.2.1.jar')
     compile 'com.google.android.gms:play-services:8.4.0'
     compile 'com.android.support:multidex:1.0.0'
+    /*compile files('src/main/java/com/doors/thegrid/jars/httpclient-4.5.1.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/commons-codec-1.9.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/fluent-hc-4.5.1.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/httpclient-cache-4.5.1.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/httpclient-win-4.5.1.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/httpcore-4.4.3.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/httpmime-4.5.1.jar')*/
+    compile files('src/main/java/com/doors/thegrid/jars/java-json.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/jna-4.1.0.jar')
+    compile files('src/main/java/com/doors/thegrid/jars/jna-platform-4.1.0.jar')
 }
+
+
+
+
+
+
 
